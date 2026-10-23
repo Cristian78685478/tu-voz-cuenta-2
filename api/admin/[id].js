@@ -1,2 +1,72 @@
-import {getSql,json} from '../../_db.js';import {isAdmin} from '../../_auth.js';
-export default async function handler(req,res){if(!isAdmin(req))return json(res,401,{error:'No autorizado.'});if(!['PATCH','POST'].includes(req.method)){res.setHeader('Allow','PATCH, POST');return json(res,405,{error:'Método no permitido.'})}const id=Number(req.query?.id),estado=String(req.body?.estado||'');if(!Number.isInteger(id)||id<=0)return json(res,400,{error:'ID no válido.'});if(!['publicado','rechazado'].includes(estado))return json(res,400,{error:'Estado no válido.'});try{const sql=getSql(),rows=await sql`UPDATE casos SET estado=${estado},revisado_en=NOW() WHERE id=${id} AND estado='pendiente' RETURNING id,estado`;if(!rows.length)return json(res,404,{error:'Caso no encontrado o ya revisado.'});return json(res,200,{ok:true,caso:rows[0]})}catch(e){console.error(e);return json(res,500,{error:'Error del servidor.'})}}
+
+import { getSql, json } from '../../_db.js';
+import { isAdmin } from '../../_auth.js';
+
+export default async function handler(req, res) {
+  if (!isAdmin(req)) {
+    return json(res, 401, { error: 'No autorizado.' });
+  }
+
+  const id = Number(req.query?.id);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return json(res, 400, { error: 'ID no válido.' });
+  }
+
+  try {
+    const sql = getSql();
+
+    if (req.method === 'DELETE') {
+      const rows = await sql`
+        DELETE FROM casos
+        WHERE id = ${id}
+        RETURNING id
+      `;
+
+      if (!rows.length) {
+        return json(res, 404, {
+          error: 'Caso no encontrado.'
+        });
+      }
+
+      return json(res, 200, {
+        ok: true,
+        mensaje: 'Caso eliminado definitivamente.'
+      });
+    }
+
+    if (!['PATCH', 'POST'].includes(req.method)) {
+      res.setHeader('Allow', 'PATCH, POST, DELETE');
+      return json(res, 405, {
+        error: 'Método no permitido.'
+      });
+    }
+
+    const estado = String(req.body?.estado || '');
+
+    if (!['publicado', 'rechazado'].includes(estado)) {
+      return json(res, 400, { error: 'Estado no válido.' });
+    }
+
+    const rows = await sql`
+      UPDATE casos
+      SET estado = ${estado}, revisado_en = NOW()
+      WHERE id = ${id} AND estado = 'pendiente'
+      RETURNING id, estado
+    `;
+
+    if (!rows.length) {
+      return json(res, 404, {
+        error: 'Caso no encontrado o ya revisado.'
+      });
+    }
+
+    return json(res, 200, {
+      ok: true,
+      caso: rows[0]
+    });
+  } catch (e) {
+    console.error(e);
+    return json(res, 500, { error: 'Error del servidor.' });
+  }
+}
