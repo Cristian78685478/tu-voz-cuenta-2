@@ -1,1 +1,2 @@
-
+import crypto from 'node:crypto';import {setAdminCookie,clearAdminCookie} from '../_auth.js';import {json} from '../_db.js';
+export default async function handler(req,res){if(req.method==='POST'){const password=String(req.body?.password||''),expected=process.env.ADMIN_PASSWORD||'',a=Buffer.from(password),b=Buffer.from(expected);if(!expected||a.length!==b.length||!crypto.timingSafeEqual(a,b))return json(res,401,{error:'Contraseña incorrecta.'});try{setAdminCookie(res);return json(res,200,{ok:true})}catch(e){console.error(e);return json(res,500,{error:'No se ha podido iniciar sesión.'})}}if(req.method==='DELETE'){clearAdminCookie(res);return json(res,200,{ok:true})}res.setHeader('Allow','POST, DELETE');return json(res,405,{error:'Método no permitido.'})}
